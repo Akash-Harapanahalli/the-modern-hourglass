@@ -181,9 +181,16 @@ def time_path():
 
 # sending discrete coordinates to serial port
 def send_to_serial(list):
-  ser = pyser.Serial('/dev/ttyS1', 19200, timeout=1)
+  # TODO: change serial port
+  ser = pyser.Serial('/dev/ttyS1', 115200, timeout=3)
   for i in range(len(list)):
-    write(str(list[i]))        # write each coordinate
+    answer = ser.read(1)
+    if answer == 1:
+      write(str(list[i]))        # write each coordinate
+    else:
+      print('timeout')
+      i -= 1
+    # if (ser.in_waiting != 0)
 
   ser.close()
 
@@ -274,7 +281,7 @@ def main():
 
 
   # sends to a serial port but currently does not work
-  # send_to_serial(time_trace)
+  send_to_serial(time_trace)
 
   return time_trace
 
