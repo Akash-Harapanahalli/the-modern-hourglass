@@ -8,9 +8,11 @@ import matplotlib.pylab as plt
 from datetime import datetime
 import serial as pyser
 import json
+from time import sleep, time
 
 def distance(curr, next):
   return (curr[0]-next[0])**2 + (curr[1]-next[1])**2
+
 
 def interpolate_path(waypoints):
     x = []
@@ -25,6 +27,7 @@ def interpolate_path(waypoints):
 
     return smooth
 
+
 def simulate_tracing(points, freq):
     points = np.array(points)
     plt.figure(1)
@@ -34,6 +37,7 @@ def simulate_tracing(points, freq):
     for i in range(len(x_smooth)):
         plt.plot(x_smooth[i], y_smooth[i], color='blue', marker='o')
         plt.pause(1/freq)
+
 
 def trace_num(number, last_x, coordinate_lookup, total_path_coords, x_scale, y_scale, number_spacing):
   image_path = '/content/%d_inv.png' % (number)
@@ -129,6 +133,7 @@ def trace_num(number, last_x, coordinate_lookup, total_path_coords, x_scale, y_s
 
   return last_x
 
+
 def create_dict(x_scale, y_scale, number_spacing):
   last_x = 0
   total_path_coords = []
@@ -151,6 +156,7 @@ def create_dict(x_scale, y_scale, number_spacing):
   file = open('dictionary.json', 'w')
   file.write(json.dumps(coordinate_lookup))
   file.close()
+
 
 # this function is mostly for fun
 def time_path():
@@ -179,13 +185,38 @@ def time_path():
   file.write(json.dumps(total_path_coords))
   file.close()
 
-# sending discrete coordinates to serial port
-def send_to_serial(list):
-  ser = pyser.Serial('/dev/ttyS1', 19200, timeout=1)
-  for i in range(len(list)):
-    write(str(list[i]))        # write each coordinate
 
-  ser.close()
+# sending discrete coordinates to serial port
+def send_to_serial(data_to_send):
+    # Open COM port (the COM port must be chosen manually)
+    try:
+        ser = pyser.Serial('COM15', 115200, timeout=3)
+    except Exception as e:
+        print(e)
+
+    # Convert list of tuples with floats to list of coordinate strings
+    for i in range(len(data_to_send)):
+        data_to_send[i] = (str(data_to_send[i][0]) + " " + str(data_to_send[i][1])).encode()
+
+    # Send the data to the microcontroller
+    start_time = time()
+    print("Sending coordinate list of length: {}".format(len(data_to_send)))
+    print("Sending coordinate: {}".format(data_to_send[0]))
+    ser.write(data_to_send.pop(0))
+    for coordinate_string in data_to_send:
+        while ser.in_waiting == 0:
+            pass
+            # sleep(0.02)
+            # print("Waiting on data from Teensy")
+        answer = int.from_bytes(ser.read(1), "little")
+        if answer == 1:
+            print("Sending coordinate: {}".format(coordinate_string))
+            ser.write(coordinate_string)  # write each coordinate
+        # print('Got {}'.format(answer))
+
+    print("Finished sending data\nTotal time was {}s".format(time() - start_time))
+    ser.close()
+
 
 def main():
   # reform dictionary to be safe and consider scale factor
@@ -266,17 +297,16 @@ def main():
       # make x coord go first and y coord go last
       time_trace[i] = (time_trace[i][1], time_trace[i][0])
 
-  plt.show(block=True)
-
-  trace_string = str(time_trace).replace(',','').replace('[','').replace(']','').replace('(','').replace(')','')
-
-  print(trace_string)
+  # plt.show(block=True)
 
 
-  # sends to a serial port but currently does not work
-  # send_to_serial(time_trace)
+  # trace_string = str(time_trace).replace(',','').replace('[','').replace(']','').replace('(','').replace(')','')
+  # print(trace_string)
+
+  send_to_serial(time_trace)
 
   return time_trace
+
 
 if __name__ == "__main__":
     main()
