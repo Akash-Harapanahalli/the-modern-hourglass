@@ -9,6 +9,7 @@ from datetime import datetime
 import serial as pyser
 import json
 from time import sleep, time
+from math import atan2, pi, sqrt
 
 def distance(curr, next):
   return (curr[0]-next[0])**2 + (curr[1]-next[1])**2
@@ -193,36 +194,57 @@ def send_to_serial(data_to_send):
         ser = pyser.Serial('COM15', 115200, timeout=3)
     except Exception as e:
         print(e)
+        ser = None
+        print("Unable to open the serial port")
 
-    # Convert list of tuples with floats to list of coordinate strings
-    for i in range(len(data_to_send)):
-        data_to_send[i] = (str(data_to_send[i][0]) + " " + str(data_to_send[i][1])).encode()
+    if ser is not None:
+        # Convert list of tuples with floats to list of coordinate strings
+        string_data_to_send = list()
+        for i in range(len(data_to_send)):
+            string_data_to_send.append((str(data_to_send[i][0]) + " " + str(data_to_send[i][1])).encode())
 
-    # Send the data to the microcontroller
-    start_time = time()
-    print("Sending coordinate list of length: {}".format(len(data_to_send)))
-    print("Sending coordinate: {}".format(data_to_send[0]))
-    ser.write(data_to_send.pop(0))
-    for coordinate_string in data_to_send:
-        while ser.in_waiting == 0:
-            pass
-            # sleep(0.02)
-            # print("Waiting on data from Teensy")
-        answer = int.from_bytes(ser.read(1), "little")
-        if answer == 1:
-            print("Sending coordinate: {}".format(coordinate_string))
-            ser.write(coordinate_string)  # write each coordinate
-        # print('Got {}'.format(answer))
+        # Send the data to the microcontroller
+        start_time = time()
+        theta_values = list()
+        r_values = list()
+        print(data_to_send[0])
+        print("Sending coordinate list of length: {}".format(len(string_data_to_send)))
+        theta_values.append(atan2(data_to_send[0][1], data_to_send[0][0]) * 180 / pi)
+        r_values.append(sqrt(data_to_send[0][0] ** 2 + data_to_send[0][1] ** 2))
+        print("Sending coordinate: {} \t r = {} \t theta = {}".format(
+            string_data_to_send[0], sqrt(data_to_send[0][0] ** 2 + data_to_send[0][1] ** 2),
+              atan2(data_to_send[0][1], data_to_send[0][0]) * 180 / pi))
+        ser.write(string_data_to_send.pop(0))
+        for i in range(len(string_data_to_send)):
+            while ser.in_waiting == 0:
+                pass
+                # sleep(0.02)
+                # print("Waiting on data from Teensy")
+            answer = int.from_bytes(ser.read(1), "little")
+            if answer == 1:
+                theta_values.append(atan2(data_to_send[i][1], data_to_send[i][0]) * 180 / pi)
+                r_values.append(sqrt(data_to_send[i][0] ** 2 + data_to_send[i][1] ** 2))
+                print("Sending coordinate: {} \t r = {} \t theta = {}".format(
+                    string_data_to_send[i], sqrt(data_to_send[i][0] ** 2 + data_to_send[i][1] ** 2),
+                    atan2(data_to_send[i][1], data_to_send[i][0]) * 180 / pi))
+                ser.write(string_data_to_send[i])  # write each coordinate
+            # print('Got {}'.format(answer))
 
-    print("Finished sending data\nTotal time was {}s".format(time() - start_time))
-    ser.close()
+        print("Finished sending data\nTotal time was {}s".format(time() - start_time))
+        ser.close()
+
+        # plt.clf()
+        # plt.plot(theta_values)
+        # plt.plot(r_values)
+        # plt.legend(["theta", "radius"])
+        # plt.show()
 
 
 def main():
   # reform dictionary to be safe and consider scale factor
   y_scale = 1
-  x_scale = 1
-  spacing = 0
+  x_scale = 5/8
+  spacing = 10
   # amount of space between minute and hour numbers
   minute_separation = 0
   # create_dict(y_scale, x_scale, spacing)
@@ -238,22 +260,22 @@ def main():
 
   print('%d%d:%d%d' % (hour // 10, hour % 10, minute // 10, minute % 10))
 
-  starting_point = (0.0, 0.0)
+  starting_point = (-1 * 500 * x_scale / 2, 20.0)
 
   time_trace = []
 
-  first_digit = path_dict['{}'.format(hour // 10)]
-  second_digit = path_dict['{}'.format(hour % 10)]
-  colon = path_dict['10']
-  third_digit = path_dict['{}'.format(minute // 10)]
-  fourth_digit = path_dict['{}'.format(minute % 10)]
+  # first_digit = path_dict['{}'.format(hour // 10)]
+  # second_digit = path_dict['{}'.format(hour % 10)]
+  # colon = path_dict['10']
+  # third_digit = path_dict['{}'.format(minute // 10)]
+  # fourth_digit = path_dict['{}'.format(minute % 10)]
 
   # to manually test out times
-  # first_digit = path_dict['1']
-  # second_digit = path_dict['2']
-  # colon = path_dict['10']
-  # third_digit = path_dict['2']
-  # fourth_digit = path_dict['1']
+  first_digit = path_dict['1']
+  second_digit = path_dict['2']
+  colon = path_dict['10']
+  third_digit = path_dict['4']
+  fourth_digit = path_dict['8']
 
   new_first_digit = []
   new_second_digit = []
@@ -304,6 +326,8 @@ def main():
   # print(trace_string)
 
   send_to_serial(time_trace)
+
+  plt.show(block=True)
 
   return time_trace
 
