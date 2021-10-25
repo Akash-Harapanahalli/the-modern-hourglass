@@ -10,8 +10,9 @@ void setup() {
   step_angle.begin();
   delay(2000);
 //  step_angle.set_speed(4);
-  step_angle.set_speed(0.2);
-//  step_angle.set_speed(5);
+//  step_angle.set_speed(0.2);
+  step_angle.set_speed(5);
+  step_angle.set_min_max(0, 2000);
 }
 
 void loop() {
